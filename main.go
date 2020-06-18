@@ -182,21 +182,25 @@ func start() {
 		cfg = ConfigFromName(*name, *home, *port)
 	}
 
+	postStart := func() {
+		if *open {
+			<-time.After(time.Second)
+			browser.OpenURL(cfg.URL())
+		} else {
+			fmt.Printf("The wiki is available at %s\n", cfg.URL())
+		}
+	}
+
 	ensure(cfg.Init())
 
 	if *daemonize {
-		if !cfg.RunDaemon() {
-			return
+		if cfg.RunDaemon() {
+			postStart()
 		}
 	} else {
 		cfg.Run()
-	}
-
-	if *open {
-		<-time.After(time.Second)
-		browser.OpenURL(cfg.URL())
-	} else {
-		fmt.Sprintf("The wiki is available at %s", cfg.URL())
+		postStart()
+		select {}
 	}
 }
 
