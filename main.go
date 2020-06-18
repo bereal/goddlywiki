@@ -130,32 +130,51 @@ func (s ServerConfig) Run() (func(), func()) {
 
 var startCmd = flag.NewFlagSet("start", flag.ExitOnError)
 
-var port = startCmd.Int("p", 8080, "port")
-var home = startCmd.String("h", getBase(), "home directory")
-var name = startCmd.String("n", "default", "wiki name")
-var file = startCmd.String("f", "", "wiki file (overrides both -n and -h)")
-var open = startCmd.Bool("o", false, "open in the browser")
-var daemonize *bool
+var startFlags struct {
+	port      int
+	home      string
+	name      string
+	file      string
+	open      bool
+	daemonize bool
+}
+
+var createCmd = flag.NewFlagSet("create", flag.ExitOnError)
+
+var createFlags struct {
+	home string
+	name string
+	file string
+}
 
 func init() {
+	startCmd.IntVar(&startFlags.port, "p", 8080, "port")
+	startCmd.StringVar(&startFlags.home, "h", getBase(), "home directory")
+	startCmd.StringVar(&startFlags.name, "n", "default", "wiki name")
+	startCmd.StringVar(&startFlags.file, "f", "", "wiki file (overrides both -n and -h)")
+	startCmd.BoolVar(&startFlags.open, "o", false, "open in the browser")
+
 	if runtime.GOOS != "windows" {
-		daemonize = startCmd.Bool("d", false, "run as a daemon")
-	} else {
-		daemonize = new(bool)
+		startCmd.BoolVar(&startFlags.daemonize, "d", false, "run as a daemon")
 	}
+
+	createCmd.StringVar(&createFlags.home, "h", getBase(), "home directory")
+	createCmd.StringVar(&createFlags.name, "n", "default", "wiki name")
+	createCmd.StringVar(&createFlags.file, "f", "", "wiki file (overrides both -n and -h)")
 }
 
 func start() {
 	startCmd.Parse(os.Args[2:])
+
 	var cfg ServerConfig
-	if *file != "" {
-		cfg = ConfigFromFile(*file, *port)
+	if startFlags.file != "" {
+		cfg = ConfigFromFile(startFlags.file, startFlags.port)
 	} else {
-		cfg = ConfigFromName(*name, *home, *port)
+		cfg = ConfigFromName(startFlags.name, startFlags.home, startFlags.port)
 	}
 
 	postStart := func() {
-		if *open {
+		if startFlags.open {
 			<-time.After(time.Second)
 			browser.OpenURL(cfg.URL())
 		} else {
@@ -167,7 +186,7 @@ func start() {
 		die("%s", err.Error())
 	}
 
-	if *daemonize {
+	if startFlags.daemonize {
 		if runAsDaemon(cfg.Run) {
 			postStart()
 		}
@@ -175,6 +194,21 @@ func start() {
 		cfg.Run()
 		postStart()
 		select {}
+	}
+}
+
+func create() {
+	createCmd.Parse(os.Args[2:])
+
+	var cfg ServerConfig
+	if createFlags.file != "" {
+		cfg = ConfigFromFile(createFlags.file, 0)
+	} else {
+		cfg = ConfigFromName(createFlags.name, createFlags.home, 0)
+	}
+
+	if err := CreateEmptyWiki(cfg.File); err != nil {
+		die("Error creating wiki file: %s\n", err.Error())
 	}
 }
 
@@ -191,6 +225,8 @@ func main() {
 		if err := stopDaemon(); err != nil {
 			die("Error stopping: %s\n", err.Error())
 		}
+	case "create":
+		create()
 	default:
 		die("Unexpected command: %s\n", os.Args[1])
 	}
