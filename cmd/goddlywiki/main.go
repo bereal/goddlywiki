@@ -14,8 +14,17 @@ import (
 
 	"github.com/markbates/pkger"
 	"github.com/pkg/browser"
+	"github.com/sevlyar/go-daemon"
 	"golang.org/x/net/webdav"
 )
+
+var daemonCtx = &daemon.Context{
+	PidFileName: "tiddly.pid",
+	PidFilePerm: 0644,
+	LogFileName: "tiddly.log",
+	LogFilePerm: 0640,
+	Umask:       027,
+}
 
 func CreateEmptyWiki(p string) (err error) {
 	f, err := os.Create(p)
@@ -45,17 +54,19 @@ type ServerConfig struct {
 	HomeDir string
 	Name    string
 	File    string
+	Port    int
 }
 
-func ConfigFromFile(f string) ServerConfig {
+func ConfigFromFile(f string, port int) ServerConfig {
 	return ServerConfig{
 		HomeDir: path.Dir(f),
 		Name:    path.Base(f),
 		File:    f,
+		Port:    port,
 	}
 }
 
-func ConfigFromName(name string, home string) ServerConfig {
+func ConfigFromName(name string, home string, port int) ServerConfig {
 	if path.Ext(name) != ".html" {
 		name = name + ".html"
 	}
@@ -64,7 +75,12 @@ func ConfigFromName(name string, home string) ServerConfig {
 		HomeDir: home,
 		Name:    name,
 		File:    path.Join(home, name),
+		Port:    port,
 	}
+}
+
+func (s ServerConfig) URL() string {
+	return fmt.Sprintf("http://localhost:%d/%s", s.Port, s.Name)
 }
 
 func (s ServerConfig) Init() error {
@@ -85,13 +101,13 @@ func (s ServerConfig) Init() error {
 	return nil
 }
 
-func (s ServerConfig) Run(port int) func() {
+func (s ServerConfig) Run() (func(), func()) {
 	srv := &webdav.Handler{
 		FileSystem: webdav.Dir(s.HomeDir),
 		LockSystem: webdav.NewMemLS(),
 	}
 
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%d", s.Port)
 	hsrv := &http.Server{
 		Addr:    addr,
 		Handler: srv,
@@ -111,8 +127,23 @@ func (s ServerConfig) Run(port int) func() {
 	return func() {
 		fmt.Println("Shutting down...")
 		hsrv.Shutdown(context.TODO())
-		wg.Wait()
+	}, wg.Wait
+}
+
+func (s ServerConfig) RunDaemon() bool {
+	d, err := daemonCtx.Reborn()
+	if err != nil {
+		die("%s\n", err.Error())
 	}
+
+	if d != nil {
+		return true
+	}
+
+	defer daemonCtx.Release()
+	s.Run()
+	daemon.ServeSignals()
+	return false
 }
 
 func ensure(err error) {
@@ -128,29 +159,57 @@ func getHome() string {
 	return "."
 }
 
-var port = flag.Int("p", 8080, "port")
-var home = flag.String("h", path.Join(getHome(), ".tiddly"), "home directory")
-var name = flag.String("n", "default", "wiki name")
-var file = flag.String("f", "", "wiki file (overrides both -n and -h)")
-var open = flag.Bool("o", false, "open in the browser")
+func die(s string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, s, args...)
+	os.Exit(1)
+}
 
-func main() {
-	flag.Parse()
+var startCmd = flag.NewFlagSet("start", flag.ExitOnError)
+
+var port = startCmd.Int("p", 8080, "port")
+var home = startCmd.String("h", path.Join(getHome(), ".tiddly"), "home directory")
+var name = startCmd.String("n", "default", "wiki name")
+var file = startCmd.String("f", "", "wiki file (overrides both -n and -h)")
+var open = startCmd.Bool("o", false, "open in the browser")
+var daemonize = startCmd.Bool("d", false, "run as a daemon")
+
+func start() {
+	startCmd.Parse(os.Args[2:])
 	var cfg ServerConfig
 	if *file != "" {
-		cfg = ConfigFromFile(*file)
+		cfg = ConfigFromFile(*file, *port)
 	} else {
-		cfg = ConfigFromName(*name, *home)
+		cfg = ConfigFromName(*name, *home, *port)
 	}
 
 	ensure(cfg.Init())
-	url := fmt.Sprintf("http://localhost:%d/%s", *port, cfg.Name)
-	fmt.Printf("Starting server, the wiki will be available at %s\n", url)
-	cfg.Run(*port)
+
+	if *daemonize {
+		if !cfg.RunDaemon() {
+			return
+		}
+	} else {
+		cfg.Run()
+	}
 
 	if *open {
 		<-time.After(time.Second)
-		browser.OpenURL(url)
+		browser.OpenURL(cfg.URL())
+	} else {
+		fmt.Sprintf("The wiki is available at %s", cfg.URL())
 	}
-	select {}
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		die("Expected a command\n")
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "start":
+		start()
+	default:
+		die("Unexpected command: %s\n", os.Args[1])
+	}
 }

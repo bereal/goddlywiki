@@ -7,7 +7,7 @@ A standalone app that serves TiddlyWiki from a local WebDAV server allowing seam
 
 ## Usage
 
-    goddlywiki [OPTIONS]
+    goddlywiki start [OPTIONS]
 
     -h string
             home directory (default "${HOME}/.tiddly")
@@ -18,7 +18,4 @@ A standalone app that serves TiddlyWiki from a local WebDAV server allowing seam
     -o	open in the browser
     -p int
             port (default 8080)
-
-## TODO:
-
- * Run as a daemon
+    -d run as a daemon
