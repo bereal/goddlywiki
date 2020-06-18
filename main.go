@@ -8,22 +8,14 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/markbates/pkger"
 	"github.com/pkg/browser"
-	"github.com/sevlyar/go-daemon"
 	"golang.org/x/net/webdav"
 )
-
-var daemonCtx = &daemon.Context{
-	PidFileName: "tiddly.pid",
-	PidFilePerm: 0644,
-	LogFileName: "tiddly.log",
-	LogFilePerm: 0640,
-	Umask:       027,
-}
 
 func CreateEmptyWiki(p string) (err error) {
 	f, err := os.Create(p)
@@ -129,42 +121,22 @@ func (s ServerConfig) Run() (func(), func()) {
 	}, wg.Wait
 }
 
-func (s ServerConfig) RunDaemon() bool {
-	d, err := daemonCtx.Reborn()
-	if err != nil {
-		die("%s\n", err.Error())
-	}
-
-	if d != nil {
-		return true
-	}
-
-	defer daemonCtx.Release()
-	s.Run()
-	daemon.ServeSignals()
-	return false
-}
-
-func getHome() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return home
-	}
-	return "."
-}
-
-func die(s string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, s, args...)
-	os.Exit(1)
-}
-
 var startCmd = flag.NewFlagSet("start", flag.ExitOnError)
 
 var port = startCmd.Int("p", 8080, "port")
-var home = startCmd.String("h", path.Join(getHome(), ".tiddly"), "home directory")
+var home = startCmd.String("h", getBase(), "home directory")
 var name = startCmd.String("n", "default", "wiki name")
 var file = startCmd.String("f", "", "wiki file (overrides both -n and -h)")
 var open = startCmd.Bool("o", false, "open in the browser")
-var daemonize = startCmd.Bool("d", false, "run as a daemon")
+var daemonize *bool
+
+func init() {
+	if runtime.GOOS != "windows" {
+		daemonize = startCmd.Bool("d", false, "run as a daemon")
+	} else {
+		daemonize = new(bool)
+	}
+}
 
 func start() {
 	startCmd.Parse(os.Args[2:])
@@ -189,7 +161,7 @@ func start() {
 	}
 
 	if *daemonize {
-		if cfg.RunDaemon() {
+		if runAsDaemon(cfg.Run) {
 			postStart()
 		}
 	} else {
