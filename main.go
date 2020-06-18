@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -120,7 +119,7 @@ func (s ServerConfig) Run() (func(), func()) {
 		defer wg.Done()
 		err := hsrv.ListenAndServe()
 		if err != nil {
-			log.Fatalf("Error starting the server: %s", err.Error())
+			die("Error starting the server: %s", err.Error())
 		}
 	}()
 
@@ -144,12 +143,6 @@ func (s ServerConfig) RunDaemon() bool {
 	s.Run()
 	daemon.ServeSignals()
 	return false
-}
-
-func ensure(err error) {
-	if err != nil {
-		log.Fatalf("%s", err)
-	}
 }
 
 func getHome() string {
@@ -191,7 +184,9 @@ func start() {
 		}
 	}
 
-	ensure(cfg.Init())
+	if err := cfg.Init(); err != nil {
+		die("%s", err.Error())
+	}
 
 	if *daemonize {
 		if cfg.RunDaemon() {
