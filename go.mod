@@ -1,4 +1,4 @@
-module github.com/bereal/gotiddly
+module github.com/bereal/goddlywiki
 
 go 1.14
 
