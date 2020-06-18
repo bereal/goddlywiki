@@ -187,6 +187,10 @@ func main() {
 	switch os.Args[1] {
 	case "start":
 		start()
+	case "stop":
+		if err := stopDaemon(); err != nil {
+			die("Error stopping: %s\n", err.Error())
+		}
 	default:
 		die("Unexpected command: %s\n", os.Args[1])
 	}

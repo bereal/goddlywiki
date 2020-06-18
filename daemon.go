@@ -4,12 +4,16 @@ import (
 	"os"
 	"path"
 	"sync"
+	"syscall"
 
 	"github.com/sevlyar/go-daemon"
 )
 
 var daemonCtx *daemon.Context
 var ctxOnce sync.Once
+
+var stopService func()
+var waitService func()
 
 func getDaemonContext() *daemon.Context {
 	ctxOnce.Do(func() {
@@ -44,7 +48,29 @@ func runAsDaemon(f launchFunc) bool {
 	}
 
 	defer ctx.Release()
-	go f()
+	stopService, waitService = f()
+	daemon.SetSigHandler(func(sig os.Signal) error {
+		stopService()
+		if sig == syscall.SIGQUIT {
+			waitService()
+		}
+		return daemon.ErrStop
+	}, syscall.SIGQUIT, syscall.SIGTERM)
 	daemon.ServeSignals()
 	return false
+}
+
+func stopDaemon() error {
+	ctx := getDaemonContext()
+	pid, err := daemon.ReadPidFile(ctx.PidFileName)
+	if err != nil {
+		return err
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
+
+	return proc.Signal(syscall.SIGQUIT)
 }

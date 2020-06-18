@@ -1,5 +1,5 @@
 # goddlywiki
-A standalone app that serves TiddlyWiki from a local WebDAV server allowing seamless save experience
+A self-contained app that serves TiddlyWiki from a local WebDAV server with nicely working saving
 
 ## Installation:
 
@@ -15,3 +15,5 @@ A standalone app that serves TiddlyWiki from a local WebDAV server allowing seam
     -p int      port (default 8080)
     -o          open in a browser
     -d          run as a daemon
+
+    goddlywiki stop
