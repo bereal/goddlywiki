@@ -1,9 +1,9 @@
 # goddlywiki
-A standalone app that serves TiddlyWiki from a local WebDav allowing seamless save experience
+A standalone app that serves TiddlyWiki from a local WebDAV server allowing seamless save experience
 
 ## Installation:
 
-  go get github.com/bereal/goddlywiki/cmd/goddlywiki
+    go get github.com/bereal/goddlywiki/cmd/goddlywiki
 
 ## Usage
 
