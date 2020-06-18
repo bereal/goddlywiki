@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
@@ -30,13 +31,19 @@ func CreateEmptyWiki(p string) (err error) {
 		}
 	}()
 
-	src, err := pkger.Open("/data/empty.html")
+	gz, err := pkger.Open("/data/empty.gz")
 	if err != nil {
 		return
 	}
-	_, err = io.Copy(f, src)
+
+	src, err := gzip.NewReader(gz)
 	if err != nil {
-		fmt.Printf("Create a new wiki file at %s", p)
+		return
+	}
+
+	_, err = io.Copy(f, src)
+	if err == nil {
+		fmt.Printf("Created a new wiki file at %s\n", p)
 	}
 	return
 }
