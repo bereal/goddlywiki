@@ -3,7 +3,7 @@ A standalone app that serves TiddlyWiki from a local WebDAV server allowing seam
 
 ## Installation:
 
-    go get github.com/bereal/goddlywiki/cmd/goddlywiki
+    go get github.com/bereal/goddlywiki
 
 ## Usage
 
