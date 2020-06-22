@@ -1,5 +1,5 @@
 # goddlywiki
-A self-contained app that serves TiddlyWiki from a local WebDAV server with nicely working saving
+A self-contained app that serves [TiddlyWiki](https://tiddlywiki.com/) from a local WebDAV server with nicely working saving
 
 ## Installation:
 
