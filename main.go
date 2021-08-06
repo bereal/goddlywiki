@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -9,9 +10,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/markbates/pkger"
 	"github.com/pkg/browser"
 )
+
+//go:embed data/empty.gz
+var content embed.FS
 
 func CreateEmptyWiki(p string) (err error) {
 	f, err := os.Create(p)
@@ -26,7 +29,7 @@ func CreateEmptyWiki(p string) (err error) {
 		}
 	}()
 
-	gz, err := pkger.Open("/data/empty.gz")
+	gz, err := content.Open("data/empty.gz")
 	if err != nil {
 		return
 	}
